@@ -914,4 +914,12 @@ class LocalAgents:
 
     def close(self):
         self.stop.set()
-        self.thread.join(timeout=15)
+        # Ctrl-C can arrive while the main thread is joining this worker.
+        # The stop flag is already set, so consume interrupts during the
+        # bounded shutdown wait rather than leaking a traceback on exit.
+        deadline = time.monotonic() + 15
+        while self.thread.is_alive() and time.monotonic() < deadline:
+            try:
+                self.thread.join(timeout=min(1, max(0, deadline - time.monotonic())))
+            except KeyboardInterrupt:
+                continue

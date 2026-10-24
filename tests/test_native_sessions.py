@@ -23,6 +23,29 @@ class NativeSessionTests(unittest.TestCase):
         path.touch()
         return Session(self.store, path, runtime, capture_details=details)
 
+    def test_local_agent_shutdown_consumes_interrupt_during_thread_join(self):
+        agents = LocalAgents(self.store)
+
+        class InterruptedOnce:
+            alive = True
+            calls = 0
+
+            def is_alive(self):
+                return self.alive
+
+            def join(self, timeout=None):
+                self.calls += 1
+                if self.calls == 1:
+                    raise KeyboardInterrupt
+                self.alive = False
+
+        thread = InterruptedOnce()
+        agents.thread = thread
+        agents.close()
+        self.assertTrue(agents.stop.is_set())
+        self.assertFalse(thread.alive)
+        self.assertEqual(thread.calls, 2)
+
     def test_mcp_configuration_inventory_reads_names_only_across_client_formats(self):
         codex = self.root / 'config.toml'
         claude = self.root / '.mcp.json'

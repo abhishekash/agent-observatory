@@ -161,6 +161,27 @@ class OpenCodeReaderTests(unittest.TestCase):
         model = next(json.loads(row[1]) for row in rows if row[0] == 'chat model-new')
         self.assertEqual(model['gen_ai.provider.name'], 'provider-new')
 
+    def test_uses_first_user_prompt_when_opencode_title_is_missing(self):
+        now_ms = time.time_ns() // 1_000_000
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute('UPDATE session SET title=? WHERE id=?', ('', 'ses_test'))
+            db.execute('INSERT INTO message VALUES(?,?,?,?,?)', (
+                'msg_user_first', 'ses_test', now_ms - 4000, now_ms - 4000,
+                json.dumps({'role': 'user'})))
+            db.execute('INSERT INTO part VALUES(?,?,?,?,?)', (
+                'part_user_first', 'ses_test', 'msg_user_first', now_ms - 4000,
+                json.dumps({'type': 'text', 'text': 'Please fix the flaky MCP reconnect test'})))
+            db.execute('INSERT INTO message VALUES(?,?,?,?,?)', (
+                'msg_user_later', 'ses_test', now_ms - 1000, now_ms - 1000,
+                json.dumps({'role': 'user'})))
+            db.execute('INSERT INTO part VALUES(?,?,?,?,?)', (
+                'part_user_later', 'ses_test', 'msg_user_later', now_ms - 1000,
+                json.dumps({'type': 'text', 'text': 'A later follow-up prompt'})))
+        reader = OpenCodeReader(self.store, path=self.database)
+        reader.poll()
+        session = next(item for item in reader.status_sessions() if item['session_id'] == 'ses_test')
+        self.assertEqual(session['task'], 'Please fix the flaky MCP reconnect test')
+
     def test_metadata_only_keeps_tool_identity_but_omits_payload_and_task(self):
         reader = OpenCodeReader(self.store, capture_details=False, path=self.database)
         reader.poll()

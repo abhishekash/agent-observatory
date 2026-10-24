@@ -62,6 +62,45 @@ def _first_timestamp(*values):
     return 0
 
 
+def _first_user_prompt(db, table, columns, session_id, part_columns=()):
+    """Return a bounded preview of the earliest user-authored prompt."""
+    if not {"id", "session_id", "data"} <= set(columns):
+        return ""
+    filters = ['"session_id"=?']
+    params = [session_id]
+    if "type" in columns:
+        filters.append('"type"=?')
+        params.append("user")
+    else:
+        filters.append('json_valid("data") AND json_extract("data",\'$.role\')=?')
+        params.append("user")
+    order = next((f'"{name}"' for name in ("seq", "time_created", "id") if name in columns), '"id"')
+    row = db.execute(f'SELECT "id","data" FROM "{table}" WHERE {" AND ".join(filters)} '
+                     f'ORDER BY {order} ASC LIMIT 1', params).fetchone()
+    if not row:
+        return ""
+    data = _json(row["data"])
+    content = data.get("text") or data.get("content") or ""
+    if isinstance(content, list):
+        content = "\n".join(str(block.get("text") or "") for block in content
+                            if isinstance(block, dict) and block.get("type") == "text")
+    if isinstance(content, str) and content.strip():
+        return safe(content, 500).strip()
+    # Legacy OpenCode stores user text in message-linked text parts.
+    if {"id", "message_id", "data"} <= set(part_columns):
+        part_order = ' ORDER BY "time_created","id"' if "time_created" in part_columns else ' ORDER BY "id"'
+        parts = db.execute(f'SELECT "data" FROM "part" WHERE "message_id"=?{part_order} LIMIT 20',
+                           (row["id"],)).fetchall()
+        text = []
+        for part in parts:
+            block = _json(part["data"])
+            if block.get("type") == "text" and isinstance(block.get("text"), str):
+                text.append(block["text"])
+        if text:
+            return safe("\n".join(text), 500).strip()
+    return ""
+
+
 def _opencode_mcp_attributes(tool_name, server_names):
     """Resolve OpenCode's ``server_tool`` IDs using configured server names.
 
@@ -470,6 +509,10 @@ class OpenCodeReader:
                                         for name, updates in activity_tables.items()]
                     read_table = max(table_candidates, default=(0, message_table))[1]
                     read_columns = self._columns(db, read_table) if read_table else set()
+                    if self.capture_details and not data.get("title") and read_table:
+                        prompt = _first_user_prompt(db, read_table, read_columns, session_id, part_columns)
+                        if prompt:
+                            item["task"] = prompt
                     if not read_table or not {"id", "session_id", "data"} <= read_columns:
                         continue
                     msg_fields = [name for name in ("id", "session_id", "type", "time_created", "time_updated", "data") if name in read_columns]
@@ -552,7 +595,8 @@ class OpenCodeReader:
                             start_ns = end_ns
                         finish = str(message_data.get("finish") or "")
                         state = "error" if finish.casefold() in {"error", "failed"} else "completed"
-                        task = str(data.get("title") or "")[:500] if self.capture_details else ""
+                        task = (str(data.get("title") or item.get("task") or "")[:500]
+                                if self.capture_details else "")
                         root_attrs = {"session.id": session_id, "agent.run.state": state,
                                       "agent.task": task or "OpenCode session",
                                       "observatory.project": project}
