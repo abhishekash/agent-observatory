@@ -15,14 +15,9 @@ LABEL = "#e1d9eb"
 CYAN, GOLD = ICE, AMBER
 
 SHORTCUTS = (('/', 'search'), ('e', 'expand'), ('t', 'trace'), ('c', 'copy'), ('q', 'quit'))
-# Keep the complete keyboard map in the persistent top-of-screen legend.
-SCOPE_HINTS = (
-    ('1–7', 'views'), ('/', 'search'), ('e', 'expand'), ('t', 'trace'),
-    ('c', 'copy'), ('p', 'pause'), ('d', 'diagnostics'), ('x', 'export'),
-    ('q', 'quit'), ('s', 'session activity'), ('a', 'reset'), ('v', 'reviews'),
-    ('[', 'newer'), (']', 'older'), ('l', 'latest'), ('alt+←', 'back'),
-    ('esc', 'close'), ('ctrl+p', 'palette'),
-)
+# Keep only the most useful global actions in the persistent top legend.
+SCOPE_HINTS = (('e', 'expand'), ('q', 'quit'), ('ctrl+p', 'palette'),
+               ('/', 'search'), ('d', 'diagnostics'))
 
 
 def shortcut_hints(keys=SHORTCUTS):

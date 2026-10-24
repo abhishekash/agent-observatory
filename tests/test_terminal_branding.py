@@ -37,7 +37,7 @@ class BrandingTest(unittest.IsolatedAsyncioTestCase):
                 self.assertLessEqual(masthead.size.height, 2 if size[1] >= 36 else 1)
                 self.assertEqual(app.query_one('#brand').size.height, 1)
 
-    async def test_complete_shortcut_legend_stays_at_the_top(self):
+    async def test_primary_shortcut_legend_stays_at_the_top(self):
         app = ObservatoryApp(ManualFeed())
         async with app.run_test(size=(160, 48)) as pilot:
             for size in ((160, 48), (120, 40), (100, 40), (80, 24)):
@@ -47,10 +47,11 @@ class BrandingTest(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(hints.display, f'{size}: hints should be visible')
                 self.assertLess(hints.region.y, app.query_one('#pages').region.y)
                 rendered = '\n'.join(hints.render_line(row).text for row in range(hints.size.height))
-                for label in ('views', 'search', 'expand', 'trace', 'copy', 'pause',
-                              'diagnostics', 'export', 'quit', 'session activity',
-                              'reset', 'reviews', 'newer', 'older', 'latest', 'back', 'palette'):
+                for label in ('expand', 'quit', 'palette', 'search', 'diagnostics'):
                     self.assertIn(label, rendered, f'{size}: missing {label}')
+                for label in ('views', 'trace', 'copy', 'pause', 'export', 'session activity',
+                              'reset', 'reviews', 'newer', 'older', 'latest', 'close'):
+                    self.assertNotIn(label, rendered, f'{size}: crowded legend still shows {label}')
 
     async def test_bottom_footer_is_removed(self):
         app = ObservatoryApp(ManualFeed())
