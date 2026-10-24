@@ -15,8 +15,9 @@ LABEL = "#e1d9eb"
 CYAN, GOLD = ICE, AMBER
 
 SHORTCUTS = (('/', 'search'), ('e', 'expand'), ('t', 'trace'), ('c', 'copy'), ('q', 'quit'))
-# The few keys worth repeating beside the scope; the footer keeps the full map.
-SCOPE_HINTS = (('/', 'search'), ('t', 'trace'), ('ctrl+p', 'palette'))
+# Keep only the most useful global actions in the persistent top legend.
+SCOPE_HINTS = (('e', 'expand'), ('q', 'quit'), ('ctrl+p', 'palette'),
+               ('/', 'search'), ('d', 'diagnostics'))
 
 
 def shortcut_hints(keys=SHORTCUTS):
@@ -25,7 +26,7 @@ def shortcut_hints(keys=SHORTCUTS):
     for index, (key, label) in enumerate(keys):
         if index:
             text.append('  ')
-        text.append(f' {key} ', style=f'bold #121018 on {AMBER}')
+        text.append(key, style=f'bold #121018 on {AMBER}')
         text.append(f' {label}', style=LABEL)
     return text
 
